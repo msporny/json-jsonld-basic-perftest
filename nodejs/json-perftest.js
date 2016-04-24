@@ -10,6 +10,6 @@ async.whilst(
   function(callback) {
     count++;
     jsonPerson = JSON.parse(person);
-    callback();
+    process.nextTick(callback);
   });
 
