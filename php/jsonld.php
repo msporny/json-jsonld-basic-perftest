@@ -4695,16 +4695,16 @@ class JsonLdProcessor {
     }
 
     // no term or @vocab match, check for possible CURIEs
+    $iri_len = strlen($iri);
     $choice = null;
     foreach($active_ctx->mappings as $term => $definition) {
-      // skip terms with colons, they can't be prefixes
-      if(strpos($term, ':') !== false) {
+      // skip null definitions and terms with colons, they can't be prefixes
+      if($definition === null || $definition->_term_has_colon) {
         continue;
       }
       // skip entries with @ids that are not partial matches
-      if($definition === null ||
-        $definition->{'@id'} === $iri ||
-        strpos($iri, $definition->{'@id'}) !== 0) {
+      if(!($iri_len > $definition->_id_length &&
+        strpos($iri, $definition->{'@id'}) === 0)) {
         continue;
       }
 
@@ -4712,10 +4712,9 @@ class JsonLdProcessor {
       // 1. it has no mapping, OR
       // 2. value is null, which means we're not compacting an @value, AND
       //   the mapping matches the IRI)
-      $curie = $term . ':' . substr($iri, strlen($definition->{'@id'}));
+      $curie = $term . ':' . substr($iri, $definition->_id_length);
       $is_usable_curie = (!property_exists($active_ctx->mappings, $curie) ||
-        ($value === null && $active_ctx->mappings->{$curie} &&
-        $active_ctx->mappings->{$curie}->{'@id'} === $iri));
+        ($value === null && $active_ctx->mappings->{$curie}->{'@id'} === $iri));
 
       // select curie if it is shorter or the same length but lexicographically
       // less than the current choice
@@ -4878,7 +4877,7 @@ class JsonLdProcessor {
 
     // clear context entry
     if($value === null || (is_object($value) &&
-        self::_hasKeyValue($value, '@id', null))) {
+      self::_hasKeyValue($value, '@id', null))) {
       $active_ctx->mappings->{$term} = null;
       $defined->{$term} = true;
       return;
@@ -4952,10 +4951,14 @@ class JsonLdProcessor {
       }
     }
 
+    // always compute whether term has a colon as an optimization for
+    // _compactIri
+    $colon = strpos($term, ':');
+    $mapping->_term_has_colon = ($colon !== false);
+
     if(!property_exists($mapping, '@id')) {
       // see if the term has a prefix
-      $colon = strpos($term, ':');
-      if($colon !== false) {
+      if($mapping->_term_has_colon) {
         $prefix = substr($term, 0, $colon);
         if(property_exists($local_ctx, $prefix)) {
           // define parent prefix
@@ -4985,6 +4988,9 @@ class JsonLdProcessor {
         $mapping->{'@id'} = $active_ctx->{'@vocab'} . $term;
       }
     }
+
+    // optimization to store length of @id once for _compactIri
+    $mapping->_id_length = strlen($mapping->{'@id'});
 
     // IRI mapping now defined
     $defined->{$term} = true;
