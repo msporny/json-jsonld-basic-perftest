@@ -2,10 +2,19 @@
 #
 # Runs the JSON vs. JSON-LD API performance test suite.
 
-echo "Processor details..."
+cd php
+echo "PHP version"
+php -v
+
+echo "Node.js version"
+nodejs -v
+
+echo "NPM version"
+npm -v
+
+echo "Processor details"
 lscpu
 
-cd php
 echo "PHP JSON parsing..."
 /usr/bin/time -v php json-perftest.php
 
